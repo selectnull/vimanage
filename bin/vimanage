@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# pathogen bundle directory
+pathogen_dir=~/.vim/bundle
+
+
+function usage {
+    echo "vimanage [-i plugin-git-url] [-d plugin] [-l] [-u] [-h]"
+    echo "manages vim config"
+    echo
+    if [ "$1" == "full" ]; then
+        echo "    -i plugin-git-url      Installs a plugin"
+        echo "    -d plugin              Deletes a plugin"
+        echo "    -l                     Lists installed plugin"
+        echo "    -u                     Updates all plugins"
+        echo "    -h                     This help"
+        echo
+    fi
+}
+
+function foreach_plugin {
+    # iterate thru plugins
+    for plugin in $pathogen_dir/*; do
+        cd $plugin
+        if [ -d "$plugin/.git" ]; then
+            # we check for .git existence on purpose, if we did not git would
+            # fall upwards thru directory tree and report .vimfiles repository
+            echo $plugin
+        fi
+    done
+}
+
+function colorize_plugin {
+    # output colors
+    name_color=$(tput setaf 3)
+    url_color=$(tput setaf 4)
+    reset_color=$(tput sgr0)
+
+    echo -e "${name_color}$(plugin_name $plugin) ${url_color}$(plugin_url $plugin) ${reset_color}"
+}
+
+function plugin_name {
+    basename "$1"
+}
+
+function plugin_url {
+    cd "$1"
+    git remote -v | grep fetch | cut -f 2 | cut -d ' ' -f 1
+}
+
+function install_plugin {
+    cd $pathogen_dir
+    git clone $1
+}
+
+function install_from_file {
+    while read plugin; do
+        install_plugin $plugin
+    done < "$1"
+}
+
+function update_plugin {
+    cd "$1"
+    git pull
+}
+
+function update_all_plugins {
+    for plugin in $(foreach_plugin); do
+        echo -e "$(colorize_plugin $plugin)"
+        update_plugin $plugin
+    done
+}
+
+function list_plugins {
+    output=""
+
+    for plugin in $(foreach_plugin); do
+        cd $plugin
+        if [ -t 1 ]; then
+            # set colors only when output is stdout, these will not be set
+            # if output is redirected to file
+            output="$output\n$(colorize_plugin $plugin)"
+        else
+            output="$output\n$(plugin_url $plugin)"
+        fi
+    done
+    echo -e $output | column -t
+}
+
+function delete_plugin {
+    rm -rf "$pathogen_dir/$1"
+}
+
+# process command line switches
+while getopts "i:d:luh" opt; do
+    case $opt in
+        i)
+            if [ -f $OPTARG ]; then
+                install_from_file $OPTARG
+            else
+                install_plugin $OPTARG
+            fi
+            ;;
+        l) list_plugins;;
+        d) delete_plugin $OPTARG;;
+        u) update_all_plugins;;
+        h) usage full;;
+    esac
+done
+
+shift $(($OPTIND - 1))
