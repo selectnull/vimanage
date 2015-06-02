@@ -91,8 +91,45 @@ function delete_plugin {
     rm -rf "$pathogen_dir/$1"
 }
 
+function _create_dir_if_needed {
+    dir=$1
+    if [ ! -d "$dir" ]; then
+        echo "$dir directory does not exist. It's been created."
+        mkdir "$dir"
+    fi
+}
+
+function _download_help {
+    echo "curl is not installed."
+    echo "Please install it via \`sudo apt-get install curl\` and try again."
+}
+
+function setup_pathogen {
+    if [ ! -f ~/.vimrc ]; then
+        echo "~/.vimrc file does not exist. It's been created."
+        # touch ~/.vimrc
+        echo "execute pathogen#infect()" >> ~/.vimrc
+    fi
+
+    _create_dir_if_needed ~/.vim
+    _create_dir_if_needed ~/.vim/bundle
+    _create_dir_if_needed ~/.vim/autoload
+
+    if [ ! -f ~/.vim/autoload/pathogen.vim ]; then
+        pathogen_downloaded_msg="pathogen.vim does not exist. It's been downloaded."
+        curl -LSso ~/.vim/autoload/pathogen.vim https://tpo.pe/pathogen.vim
+        if [ $? -eq 0 ]; then
+            echo $pathogen_downloaded_msg
+        else
+            _download_help
+        fi
+    fi
+
+    echo "Done."
+}
+
 # process command line switches
-while getopts "i:d:luh" opt; do
+while getopts "i:d:sluh" opt; do
     case $opt in
         i)
             if [ -f $OPTARG ]; then
@@ -102,6 +139,7 @@ while getopts "i:d:luh" opt; do
             fi
             ;;
         l) list_plugins;;
+        s) setup_pathogen;;
         d) delete_plugin $OPTARG;;
         u) update_all_plugins;;
         h) usage full;;

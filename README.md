@@ -11,31 +11,38 @@ It presupposes that:
 How to use
 ----------
 
-Install a plugin from git repository url:
+**Install a plugin from git repository url:**
 
     vimanage -i plugin-git-url
 
-Deletes a plugin:
+**Delete a plugin:**
 
     vimanage -d plugin-directory
 
-Lists installed plugins:
+**List installed plugins:**
 
     vimanage -l
 
-Save installed plugins to file:
+**Save installed plugins to a file:**
 
     vimanage -l > plugins.txt
 
 This works the same way python's `pip freeze > requirements.txt` works.
 
-Install plugins from file (one git repository per line):
+**Install plugins from file (one git repository per line):**
 
     vimanage -i plugins.txt
 
 Just like `pip install -r requirements.txt`.
 
-Help:
+**Setup pathogen:**
+
+    vimanage -s
+
+Checks for .vimrc file and .vim, autoload and bundle directories.
+Creates what's missing. Downloads pathogen.vim script. Tries to be helpful.
+
+**Help:**
 
     vimanage -h
 
