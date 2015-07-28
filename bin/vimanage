@@ -21,11 +21,11 @@ function usage {
 function foreach_plugin {
     # iterate thru plugins
     for plugin in $pathogen_dir/*; do
-        cd $plugin
+        cd "$plugin"
         if [ -d "$plugin/.git" ]; then
             # we check for .git existence on purpose, if we did not git would
             # fall upwards thru directory tree and report .vimfiles repository
-            echo $plugin
+            echo "$plugin"
         fi
     done
 }
@@ -50,12 +50,12 @@ function plugin_url {
 
 function install_plugin {
     cd $pathogen_dir
-    git clone $1
+    git clone "$1"
 }
 
 function install_from_file {
     while read plugin; do
-        install_plugin $plugin
+        install_plugin "$plugin"
     done < "$1"
 }
 
@@ -67,7 +67,7 @@ function update_plugin {
 function update_all_plugins {
     for plugin in $(foreach_plugin); do
         echo -e "$(colorize_plugin $plugin)"
-        update_plugin $plugin
+        update_plugin "$plugin"
     done
 }
 
@@ -75,7 +75,7 @@ function list_plugins {
     output=""
 
     for plugin in $(foreach_plugin); do
-        cd $plugin
+        cd "$plugin"
         if [ -t 1 ]; then
             # set colors only when output is stdout, these will not be set
             # if output is redirected to file
@@ -84,11 +84,12 @@ function list_plugins {
             output="$output\n$(plugin_url $plugin)"
         fi
     done
-    echo -e $output | column -t
+    echo -e "$output" | column -t
 }
 
 function delete_plugin {
-    rm -rf "$pathogen_dir/$1"
+    plugin="$1"
+    rm -rf "${pathogen_dir}/${plugin:?}"
 }
 
 function _create_dir_if_needed {
@@ -106,8 +107,7 @@ function _download_help {
 
 function setup_pathogen {
     if [ ! -f ~/.vimrc ]; then
-        echo "~/.vimrc file does not exist. It's been created."
-        # touch ~/.vimrc
+        echo "$HOME/.vimrc file does not exist. It's been created."
         echo "execute pathogen#infect()" >> ~/.vimrc
     fi
 
@@ -119,7 +119,7 @@ function setup_pathogen {
         pathogen_downloaded_msg="pathogen.vim does not exist. It's been downloaded."
         curl -LSso ~/.vim/autoload/pathogen.vim https://tpo.pe/pathogen.vim
         if [ $? -eq 0 ]; then
-            echo $pathogen_downloaded_msg
+            echo "$pathogen_downloaded_msg"
         else
             _download_help
         fi
@@ -132,15 +132,15 @@ function setup_pathogen {
 while getopts "i:d:sluh" opt; do
     case $opt in
         i)
-            if [ -f $OPTARG ]; then
-                install_from_file $OPTARG
+            if [ -f "$OPTARG" ]; then
+                install_from_file "$OPTARG"
             else
-                install_plugin $OPTARG
+                install_plugin "$OPTARG"
             fi
             ;;
         l) list_plugins;;
         s) setup_pathogen;;
-        d) delete_plugin $OPTARG;;
+        d) delete_plugin "$OPTARG";;
         u) update_all_plugins;;
         h) usage full;;
     esac
