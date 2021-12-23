@@ -1,36 +1,49 @@
 #!/bin/bash
 
-# pathogen bundle directory
-pathogen_dir=~/.vim/bundle
+packages_root=~/.vim/pack
 
+# make VIMANAGE_ROOT environment variable as default for packages_root
+[ ! -z "${VIMANAGE_ROOT}" ] && packages_root=$(realpath ${VIMANAGE_ROOT})
 
-function usage {
-    echo "vimanage [-i plugin-git-url] [-d plugin] [-l] [-u] [-h]"
-    echo "manages vim config"
+usage() {
+    echo "vimanage manages vim/nvim packages"
+    echo "version 1.0"
     echo
     if [ "$1" == "full" ]; then
-        echo "    -i plugin-git-url      Installs a plugin"
-        echo "    -d plugin              Deletes a plugin"
-        echo "    -l                     Lists installed plugin"
-        echo "    -u                     Updates all plugins"
-        echo "    -h                     This help"
+        echo "    add <plugin-git-url>    Add a plugin"
+        echo "    remove <plugin>         Remove a plugin"
+        echo "    list                    List installed plugin"
+        echo "    update                  Update all plugins"
+        echo "    help                    Show this help"
         echo
     fi
 }
 
-function foreach_plugin {
-    # iterate thru plugins
-    for plugin in $pathogen_dir/*; do
-        cd "$plugin"
-        if [ -d "$plugin/.git" ]; then
-            # we check for .git existence on purpose, if we did not git would
-            # fall upwards thru directory tree and report .vimfiles repository
-            echo "$plugin"
-        fi
+default_packlib_dir() {
+    for packlib in $packages_root/*; do
+        [ -d "$packlib" ] && {
+            echo "$packlib"
+            break
+        }
     done
 }
 
-function colorize_plugin {
+foreach_plugin() {
+    # iterate thru plugins
+    for packlib in $packages_root/*; do
+        for startopt in $packlib/*; do
+            for plugin in $startopt/*; do
+                if [ -d "$plugin/.git" ]; then
+                    # we check for .git existence on purpose, if we did not git would
+                    # fall upwards thru directory tree and report .vimfiles repository
+                    echo "$plugin"
+                fi
+            done
+        done
+    done
+}
+
+colorize_plugin() {
     # output colors
     name_color=$(tput setaf 3)
     url_color=$(tput setaf 4)
@@ -39,43 +52,43 @@ function colorize_plugin {
     echo -e "${name_color}$(plugin_name $plugin) ${url_color}$(plugin_url $plugin) ${reset_color}"
 }
 
-function plugin_name {
+plugin_name() {
     basename "$1"
 }
 
-function plugin_url {
-    cd "$1"
-    git remote -v | grep fetch | cut -f 2 | cut -d ' ' -f 1
+plugin_url() {
+    git --git-dir "$1/.git" remote -v | grep fetch | cut -f 2 | cut -d ' ' -f 1
 }
 
-function install_plugin {
-    cd $pathogen_dir
-    git clone "$1"
-}
+add_plugin() (
+    cd "$(default_packlib_dir)/start"
+    git clone -- "$1"
+)
 
-function install_from_file {
+install_from_file() {
     while read plugin; do
-        install_plugin "$plugin"
+        add_plugin "$plugin"
     done < "$1"
 }
 
-function update_plugin {
-    cd "$1"
-    git pull
+update_plugin() {
+    git --git-dir "$1/.git" --work-tree "$1" pull
 }
 
-function update_all_plugins {
+update_all_plugins() {
     for plugin in $(foreach_plugin); do
         echo -e "$(colorize_plugin $plugin)"
         update_plugin "$plugin"
     done
 }
 
-function list_plugins {
+list_plugins() {
+    # for plugin in $(foreach_plugin); do
+    #     echo $plugin
+    # done
+    # exit 1
     output=""
-
     for plugin in $(foreach_plugin); do
-        cd "$plugin"
         if [ -t 1 ]; then
             # set colors only when output is stdout, these will not be set
             # if output is redirected to file
@@ -87,63 +100,52 @@ function list_plugins {
     echo -e "$output" | column -t
 }
 
-function delete_plugin {
+remove_plugin() {
     plugin="$1"
-    rm -rf "${pathogen_dir}/${plugin:?}"
-}
-
-function _create_dir_if_needed {
-    dir=$1
-    if [ ! -d "$dir" ]; then
-        echo "$dir directory does not exist. It's been created."
-        mkdir "$dir"
-    fi
-}
-
-function _download_help {
-    echo "curl is not installed."
-    echo "Please install it via \`sudo apt-get install curl\` and try again."
-}
-
-function setup_pathogen {
-    if [ ! -f ~/.vimrc ]; then
-        echo "$HOME/.vimrc file does not exist. It's been created."
-        echo "execute pathogen#infect()" >> ~/.vimrc
-    fi
-
-    _create_dir_if_needed ~/.vim
-    _create_dir_if_needed ~/.vim/bundle
-    _create_dir_if_needed ~/.vim/autoload
-
-    if [ ! -f ~/.vim/autoload/pathogen.vim ]; then
-        pathogen_downloaded_msg="pathogen.vim does not exist. It's been downloaded."
-        curl -LSso ~/.vim/autoload/pathogen.vim https://tpo.pe/pathogen.vim
-        if [ $? -eq 0 ]; then
-            echo "$pathogen_downloaded_msg"
-        else
-            _download_help
+    tmp_dir=$(mktemp -d)
+    for p in $(foreach_plugin); do
+        if [ $(plugin_name "$p") = "$plugin" ]; then
+            echo "Deleting plugin $plugin"
+            mv "$p" "$tmp_dir"
         fi
-    fi
-
-    echo "Done."
+    done
+    rm -rf "$tmp_dir"
 }
+
 
 # process command line switches
-while getopts "i:d:sluh" opt; do
-    case $opt in
-        i)
-            if [ -f "$OPTARG" ]; then
-                install_from_file "$OPTARG"
-            else
-                install_plugin "$OPTARG"
-            fi
-            ;;
-        l) list_plugins;;
-        s) setup_pathogen;;
-        d) delete_plugin "$OPTARG";;
-        u) update_all_plugins;;
-        h) usage full;;
-    esac
-done
-
-shift $(($OPTIND - 1))
+subcommand=$1
+case "$subcommand" in
+    add|install|i)
+        shift
+        if [ -f "$1" ]; then
+            install_from_file "$1"
+        else
+            add_plugin "$1"
+        fi
+        ;;
+    list|l)
+        shift
+        list_plugins
+        ;;
+    remove|uninstall|d)
+        shift
+        remove_plugin "$1"
+        ;;
+    update|u)
+        shift
+        update_all_plugins
+        ;;
+    help|h)
+        shift
+        usage full
+        ;;
+    libs)
+        shift
+        default_packlib_dir
+        ;;
+    *)
+        echo "Invalid command: $1"
+        exit 1
+        ;;
+esac
